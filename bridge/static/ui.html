@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MilqBridge — FreeMilk OpenAI API</title>
+<link rel="stylesheet" href="/ui.css">
+</head>
+<body>
+<div class="app">
+  <aside class="side">
+    <div class="brand">
+      <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="#22C55E" stroke-width="2"><path d="M8 2v4M16 2v4M5 10h14M6 4h12a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z"/></svg>
+      <div><b>MilqBridge</b><span>FreeMilk → OpenAI API</span></div>
+    </div>
+    <nav id="nav">
+      <button data-view="overview" class="on"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="9"/><rect x="14" y="3" width="7" height="5"/><rect x="14" y="12" width="7" height="9"/><rect x="3" y="16" width="7" height="5"/></svg>Overview</button>
+      <button data-view="login"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4M10 17l5-5-5-5M15 12H3"/></svg>Login</button>
+      <button data-view="models"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2 2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>Models</button>
+      <button data-view="usage"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18M7 14l4-4 3 3 5-6"/></svg>Usage & Status</button>
+      <button data-view="agent"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="m16 18 6-6-6-6M8 6l-6 6 6 6"/></svg>Agent setup</button>
+    </nav>
+    <div class="side-foot">
+      <div id="side-plan" class="planchip">ChatGPT: not connected</div>
+    </div>
+  </aside>
+
+  <main class="main">
+    <!-- OVERVIEW -->
+    <section id="view-overview" class="view on">
+      <header><h1>Overview</h1><p>FreeMilk models behind one OpenAI-compatible endpoint.</p></header>
+      <div class="grid g3">
+        <div class="card"><div class="stat"><b id="ov-reqs">0</b><span>requests</span></div></div>
+        <div class="card"><div class="stat"><b id="ov-tokens">0</b><span>tokens used</span></div></div>
+        <div class="card"><div class="stat"><b id="ov-errs">0</b><span>errors</span></div></div>
+      </div>
+      <div class="grid g2">
+        <div class="card">
+          <h3>Connection</h3>
+          <div class="kv"><span>API base</span><code id="ov-base"></code></div>
+          <div class="kv"><span>API key</span><code id="ov-key">…</code><button class="mini" data-copy="ov-key">copy</button></div>
+          <div class="kv"><span>FreeMilk backend</span><code>https://api.milq.ai</code></div>
+          <div class="kv"><span>ChatGPT sign-in</span><b id="ov-login" class="badge red">not connected</b></div>
+          <button class="primary" data-go="login">Connect ChatGPT</button>
+        </div>
+        <div class="card">
+          <h3>Test a model</h3>
+          <div class="row"><input id="ov-prompt" placeholder="Type a message…" value="Say OK in one word."/>
+            <select id="ov-model"></select></div>
+          <button class="primary" id="ov-run">Send request</button>
+          <pre id="ov-out" class="out" hidden></pre>
+        </div>
+      </div>
+      <div class="card">
+        <h3>Recent activity</h3>
+        <table class="tbl"><thead><tr><th>time</th><th>model</th><th>tier</th><th>status</th><th>in/out</th><th>ms</th></tr></thead><tbody id="ov-log"></tbody></table>
+      </div>
+    </section>
+
+    <!-- LOGIN -->
+    <section id="view-login" class="view">
+      <header><h1>Login</h1><p>Uses FreeMilk's own ChatGPT/Codex device flow — the real app environment, replicated.</p></header>
+      <div class="grid g2">
+        <div class="card">
+          <h3>1 · ChatGPT / Codex (models gpt-5-codex & premium fallback)</h3>
+          <div id="cx-idle">
+            <p class="muted">Click start — a one-time code appears; approve it in the browser page with your ChatGPT account.</p>
+            <button class="primary" id="cx-start">Start device login</button>
+          </div>
+          <div id="cx-wait" hidden>
+            <div class="codebox"><b id="cx-code">—</b></div>
+            <p class="muted">Open this and enter the code:</p>
+            <a id="cx-url" class="link" target="_blank" rel="noopener">auth.openai.com/codex/device</a>
+            <p class="muted" id="cx-state">Waiting for approval…</p>
+            <button class="mini" id="cx-copy">copy code</button>
+          </div>
+          <div id="cx-done" hidden>
+            <p class="badge green">Signed in — <span id="cx-plan"></span></p>
+            <p class="muted" id="cx-acc"></p>
+            <button class="mini" id="cx-again">Sign in again</button>
+          </div>
+          <div id="cx-err" hidden class="badge red"></div>
+        </div>
+        <div class="card">
+          <h3>2 · Google (FreeMilk account session)</h3>
+          <p class="muted">FreeMilk account login = Google identity exchanged at <code>api.milq.ai/account/auth/google</code> (field <code>identity_token</code>, verified). The mobile <code>/auth/google</code> additionally demands a device attestation from iPhones — this bridge performs the web-side exchange.</p>
+          <a id="gg-url" class="link" target="_blank" rel="noopener">Open Google consent</a>
+          <p class="muted">After approving, your browser lands on a <code>com.googleusercontent.apps…</code> URL — copy the <code>code=</code> value:</p>
+          <div class="row"><input id="gg-code" placeholder="4/0AX42C… or full callback URL"/><button id="gg-ex" class="primary">Exchange</button></div>
+          <pre id="gg-out" class="out" hidden></pre>
+        </div>
+      </div>
+    </section>
+
+    <!-- MODELS -->
+    <section id="view-models" class="view">
+      <header><h1>Models</h1><p>Catalog recovered from FreeMilk's <code>HostedModels</code>: free daily (SIPS, ad-supported), ChatGPT-plan Codex, and premium.</p></header>
+      <div class="row chips" id="tierchips">
+        <button class="chip on" data-t="">All</button><button class="chip" data-t="free">Free daily</button><button class="chip" data-t="plan">ChatGPT plan</button><button class="chip" data-t="premium">Premium</button>
+      </div>
+      <div class="grid g3" id="modelgrid"></div>
+    </section>
+
+    <!-- USAGE -->
+    <section id="view-usage" class="view">
+      <header><h1>Usage & Status</h1><p>Per-request status, token counts, model mix and the ChatGPT plan meter.</p></header>
+      <div class="grid g3">
+        <div class="card"><div class="stat"><b id="u-reqs">0</b><span>requests</span></div></div>
+        <div class="card"><div class="stat"><b id="u-in">0</b><span>input tokens</span></div></div>
+        <div class="card"><div class="stat"><b id="u-out">0</b><span>output tokens</span></div></div>
+      </div>
+      <div class="grid g2">
+        <div class="card"><h3>By model</h3><table class="tbl"><tbody id="u-bymodel"></tbody></table></div>
+        <div class="card"><h3>ChatGPT plan meter (wham)</h3><pre id="u-wham" class="out">—</pre></div>
+      </div>
+      <div class="card"><h3>Request log</h3><table class="tbl"><thead><tr><th>time</th><th>model</th><th>tier</th><th>status</th><th>in/out</th><th>ms</th><th>error</th></tr></thead><tbody id="u-log"></tbody></table></div>
+    </section>
+
+    <!-- AGENT -->
+    <section id="view-agent" class="view">
+      <header><h1>Agent setup</h1><p>Point any OpenAI-compatible agent at the bridge.</p></header>
+      <div class="card"><h3>Environment</h3>
+        <pre id="ag-env" class="out"></pre><button class="mini" data-copytext="ag-env">copy</button></div>
+      <div class="card"><h3>OpenAI Python SDK</h3>
+        <pre id="ag-py" class="out"></pre><button class="mini" data-copytext="ag-py">copy</button></div>
+      <div class="card"><h3>curl</h3>
+        <pre id="ag-curl" class="out"></pre><button class="mini" data-copytext="ag-curl">copy</button></div>
+      <div class="card"><h3>Settings (keys are stored locally, never logged)</h3>
+        <div class="row"><input id="set-oai" placeholder="OpenAI API key (optional, unlocks premium fallback)"/><button id="set-save" class="primary">Save</button></div>
+        <pre id="set-out" class="out" hidden></pre></div>
+    </section>
+  </main>
+</div>
+<div id="toast" class="toast" hidden></div>
+<script src="/ui.js"></script>
+</body>
+</html>

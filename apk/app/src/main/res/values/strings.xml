@@ -1,0 +1,7 @@
+<resources>
+    <string name="app_name">MilqBridge</string>
+    <string name="tab_status">Status</string>
+    <string name="tab_login">Login</string>
+    <string name="tab_models">Models</string>
+    <string name="tab_usage">Usage</string>
+</resources>
