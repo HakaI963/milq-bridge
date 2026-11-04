@@ -46,3 +46,14 @@ python3 tests/test_bridge.py   # 13 offline tests: UI, tiers, gates, codecs, SSE
 FreeMilk serves its free catalog only to device-attested iOS clients (`X-Firebase-AppCheck`, Apple App Attest — proven hardware-bound, see docs/REVERSE.md §2). The bridge therefore becomes your client: it imports **your own** FreeMilk session + catalog once (paste, or run the bundled Termux capture proxy: `capture/milq_capture.py`), and every free model answers through your account — with SIPS/plan shown and per-request usage logged. Until an import exists the UI states this plainly rather than pretending.
 
 ![UI screenshots](docs/) — see `shots/` for the rendered dashboard on 412×915 (phone) and desktop.
+
+
+## ⚡ Free models without any account — live now
+The bridge serves a **keyless** free OpenAI-compatible model (Pollinations gpt-oss-20b) out of the box, and free-coding-tier models (Cerebras/DeepInfra/Groq/OpenRouter/Google — all free browser signups, no card) the moment you paste their keys in Settings:
+```
+curl -X POST http://127.0.0.1:11434/v1/chat/completions \
+  -H "Authorization: Bearer <bridge-key>" -H "Content-Type: application/json" \
+  -d '{"model":"openai-fast","messages":[{"role":"user","content":"27*13?"}]}'
+→ "351"   (verified live: HTTP 200 + SSE streaming + usage counts)
+```
+FreeMilk itself is iOS-signup/attestation-locked (App Store: seller *Milq Incorporated*, "free…funded by ads…daily allowance" — no web/Android client exists; docs/REVERSE.md §v1.2). If you ever get one-time access to a logged-in iOS session, the import pipeline lights its exact catalog too.

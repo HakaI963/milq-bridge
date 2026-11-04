@@ -262,6 +262,23 @@ class BridgeTests(unittest.TestCase):
         self.assertIn("a", flat); self.assertIn("b", flat)
         self.assertEqual(flat["b"]["tier"], "premium")
 
+    def test_alt_keyless_routing(self):
+        # openai-fast must go to the keyless pollinations surface at .../openai (no key needed)
+        self.fake.script["text.pollinations.ai/openai"] = (200, {"id": "p1",
+            "choices": [{"message": {"role": "assistant", "content": "351"}}],
+            "usage": {"prompt_tokens": 2, "completion_tokens": 1, "total_tokens": 3}})
+        st, raw = self.req("POST", "/v1/chat/completions",
+                           {"model": "openai-fast", "messages": [{"role": "user", "content": "27*13?"}]})
+        self.assertEqual(st, 200)
+        self.assertEqual(json.loads(raw)["choices"][0]["message"]["content"], "351")
+        call = [c for c in self.fake.calls if "pollinations" in c[1]][-1]
+        self.assertTrue(call[1].endswith("/openai"))
+        self.assertIsNone(call[2].get("Authorization"))
+        # needs-key providers answer 402 without a key
+        st2, raw2 = self.req("POST", "/v1/chat/completions",
+                             {"model": "cerebras:qwen-3-235b", "messages": [{"role": "user", "content": "x"}]})
+        self.assertEqual(st2, 402)
+
     # ---- usage counters ----
     def test_usage_tracks_everything(self):
         st, raw = self.req("GET", "/usage")

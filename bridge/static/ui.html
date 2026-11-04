@@ -139,6 +139,18 @@ a{color:var(--blue)}
       <pre class="out" id="fr-out" hidden></pre>
     </div>
 
+    <div class="card okbox">
+      <h2>⚡ Instant free models — no account, no key</h2>
+      <p class="note">Live now through the bridge: keyless OpenAI-compatible backends discovered in the “full internet” hunt (FreeMilk itself is iOS-signup-locked). Tap Test — works from any agent with just the bridge URL.</p>
+      <div class="grid" id="altgrid"></div>
+      <h3>Add free keys (optional, unlocks coding-grade models)</h3>
+      <p class="note">Every key below is free (browser signup, no card): <a href="https://cloud.cerebras.ai" target="_blank" rel="noopener">Cerebras</a> · <a href="https://deepinfra.com/dash/api_keys" target="_blank" rel="noopener">DeepInfra</a> · <a href="https://console.groq.com/keys" target="_blank" rel="noopener">Groq</a> · <a href="https://openrouter.ai/settings/keys" target="_blank" rel="noopener">OpenRouter</a> · <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">Google AI</a></p>
+      <div class="row"><input id="ak-cerebras" placeholder="CEREBRAS_API_KEY"><input id="ak-groq" placeholder="GROQ_API_KEY"></div>
+      <div class="row"><input id="ak-openrouter" placeholder="OPENROUTER_API_KEY"><input id="ak-google" placeholder="GOOGLE_API_KEY"></div>
+      <div class="row"><input id="ak-deepinfra" placeholder="DEEPINFRA_API_KEY"><button class="btn blue" id="ak-save">Save keys</button></div>
+      <pre class="out" id="ak-out" hidden></pre>
+    </div>
+
     <div class="card">
       <h2>1 · Sign in to FreeMilk (phone browser)</h2>
       <ol class="steps">
@@ -219,7 +231,7 @@ async function refreshAll(){
   const m=await GETA('/v1/models'); if(m.status===200){MODELS=m.json.data;}
   $('#h-models').textContent=MODELS.length;
   $('#h-freecnt').textContent=MODELS.filter(x=>x.milq&&x.milq.backend==='milq-captured').length;
-  renderModels();renderQuick();
+  renderModels();renderQuick();renderAlt();
   const u=await GETA('/usage');if(u.status===200){const L=u.json.local;
     $('#h-reqs').textContent=L.requests;$('#h-tokens').textContent=L.in_tokens+L.out_tokens;
     $('#u-reqs').textContent=L.requests;$('#u-in').textContent=L.in_tokens;$('#u-out').textContent=L.out_tokens;$('#u-err').textContent=L.errors;
@@ -230,6 +242,20 @@ async function refreshAll(){
   $('#ag-curl').textContent=`curl ${base}/chat/completions \\\n  -H "Authorization: Bearer ${KEY||'KEY'}" -H "Content-Type: application/json" \\\n  -d '{"model":"gpt-6-astra","messages":[{"role":"user","content":"hi"}]}'`;
   $('#cap-cmd').textContent=`termux-setup-storage && pkg update -y && pkg install -y python git termux-services && git clone https://github.com/HakaI963/milq-bridge && cd milq-bridge && python -m pip install --user mitmproxy && BRIDGE=http://127.0.0.1:11434 ~/.local/bin/mitmdump -s capture/milq_capture.py --listen-address :: --listen-port 8080`;
 }
+function renderAlt(){
+  const g=$('#altgrid'); if(!g) return;
+  const alts=MODELS.filter(m=>m.milq&&String(m.milq.backend).startsWith('alt:'));
+  g.innerHTML=alts.map(m=>{const keyless=m.milq.backend==='alt:pollinations';
+    return `<div class="card mcard"><span class="tier free">${keyless?'KEYLESS':'FREE KEY'}</span>
+    <h3>${m.milq.display}</h3><div class="mid">${m.id}</div>
+    <div class="row"><button class="btn small ${keyless?'':'ghost'}" onclick="testOne('${m.id}')">Test</button></div></div>`}).join('')||'<p class="mut-c">loading…</p>';
+}
+$('#ak-save').onclick=async()=>{
+  const alt_keys={};
+  const map={cerebras:'ak-cerebras',groq:'ak-groq',openrouter:'ak-openrouter',google:'ak-google',deepinfra:'ak-deepinfra'};
+  for(const [p,id] of Object.entries(map)){const v=$('#'+id).value.trim();if(v)alt_keys[p]=v;}
+  if(!Object.keys(alt_keys).length)return toast('paste at least one key',false);
+  const r=await POST('/settings',{alt_keys});$('#ak-out').hidden=false;$('#ak-out').textContent=JSON.stringify(r.json)+' — models refresh below';refreshAll();};
 function renderModels(){
   const g=$('#grid');const list=MODELS.filter(m=>!TIER||(m.milq&&m.milq.tier===TIER));
   g.innerHTML=list.map(m=>{const q=m.milq||{};const t=q.tier||'free';

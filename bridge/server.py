@@ -138,6 +138,37 @@ def refresh_milq_tokens():
             return 502, {"error": str(e)}
     return code, {"detail": raw[:400].decode(errors="replace")}
 
+def alt_key(name):
+    """Alt provider keys: stored via /settings (env fallback)."""
+    envname = env.ALT_PROVIDERS.get(name, {}).get("key_env")
+    return (CODEX.tokens.get("alt_keys") or {}).get(name) or (os.environ.get(envname) if envname else None)
+
+def alt_chat(mid, body, stream):
+    """Route alt:<provider> or bare pollinations ids."""
+    prov = None
+    real = mid
+    if ":" in mid and mid.split(":")[0] in env.ALT_PROVIDERS:
+        prov, real = mid.split(":", 1)
+    elif mid in ("openai-fast", "openai", "gpt-oss", "gpt-oss-20b"):
+        prov, real = "pollinations", "openai-fast"
+    if not prov:
+        return None
+    cfg = env.ALT_PROVIDERS[prov]
+    key = alt_key(prov)
+    if cfg["key_env"] and not key:
+        return 402, json.dumps({"error": {"message": f"{prov} needs a free API key — add it in Settings (Agents tab)", "type": "key_required"}}).encode()
+    path = cfg.get("path", "/chat/completions")
+    url = cfg["base"].rstrip("/") + path
+    hdrs = {"Content-Type": "application/json", "User-Agent": "Mozilla/5.0 (compatible; milq-bridge/1.2)",
+            "Accept": "text/event-stream" if stream else "application/json"}
+    if cfg["auth"] == "bearer" and key:
+        hdrs["Authorization"] = "Bearer " + key
+    if prov == "pollinations":
+        hdrs["X-Referrer"] = "milq-bridge"
+    out = dict(body); out["model"] = real
+    if stream: out["stream"] = True
+    return http_json("POST", url, headers=hdrs, body=out, timeout=180)
+
 def provider_chat(mid, body, stream):
     """Call the captured per-model provider endpoint exactly like the app does."""
     m = CATALOG.get(mid) or {}
@@ -363,7 +394,9 @@ class H(BaseHTTPRequestHandler):
             tier = (urllib.parse.parse_qs(self.path.split("?")[1] if "?" in self.path else "")
                     .get("tier", [None])[0])
             data = []
+            seen = set()
             for mid, cm in CATALOG.items():
+                seen.add(mid)
                 mm = {"id": mid, "object": "model", "created": 1760000000,
                       "owned_by": "freemilk",
                       "milq": {"tier": cm.get("tier") or "free", "display": cm.get("name") or mid,
@@ -374,6 +407,10 @@ class H(BaseHTTPRequestHandler):
                                "backend": "milq-captured" if (cm.get("base_url") or cm.get("api_key")) else (env.model_by_id(mid) or {}).get("backend", "milq"),
                                "mode": "agent"}}
                 if not tier or mm["milq"]["tier"] == tier: data.append(mm)
+            for am in env.alt_models({(env.ALT_PROVIDERS[p].get("key_env") or "POLL"): True
+                                      for p in env.ALT_PROVIDERS if p == "pollinations" or alt_key(p)}):
+                if am["id"] in seen: continue
+                if not tier or am["milq"]["tier"] == tier: data.append(am)
             return self.send_json(200, {"object": "list", "data": data})
         if p.startswith("/v1/models/"):
             if not authed(self.headers): return self.send_json(401, err("invalid key"))
@@ -538,6 +575,8 @@ class H(BaseHTTPRequestHandler):
             for k in ("openai_api_key", "anthropic_api_key", "milq_device_token"):
                 if body.get(k) is not None:
                     CODEX.tokens[k] = body[k]
+            if isinstance(body.get("alt_keys"), dict):
+                CODEX.tokens.setdefault("alt_keys", {}).update(body["alt_keys"])
             CODEX._save()
             return self.send_json(200, {"ok": True})
 
@@ -560,7 +599,7 @@ class H(BaseHTTPRequestHandler):
             note(body.get("model", "?"), "?", 401, err="unauthorized", ms=int((time.time()-t0)*1000))
             return self.send_json(401, err("invalid API key for milq-bridge"))
         model = body.get("model", "gpt-5-codex")
-        m = env.model_by_id(model) or {"tier": "external", "backend": "openai", "id": model}
+        m = env.model_by_id(model) or {"tier": "free", "backend": "openai", "id": model}
         # captured catalog wins for routing decisions
         cm = CATALOG.get(model) or {}
         if cm.get("base_url") or cm.get("api_key"):
@@ -579,10 +618,22 @@ class H(BaseHTTPRequestHandler):
             note(model, tier, 402, err="premium locked", ms=int((time.time()-t0)*1000))
             return self.send_json(402, {"error": {"message": f"'{model}' is premium: subscribe or POST /ads/unlock", "type": "premium_required"}})
         has_provider = (CATALOG.get(model) or {}).get("base_url") or (CATALOG.get(model) or {}).get("api_key") or has_provider
-        if tier in ("free", "plan") and not CODEX.tokens.get("access_token") and backend == "codex" and not has_provider:
+        if tier in ("free", "plan") and not CODEX.tokens.get("access_token") and backend == "codex" and not has_provider and model.split(":")[0] not in env.ALT_PROVIDERS and model not in ("openai-fast","openai","gpt-oss","gpt-oss-20b"):
             note(model, tier, 401, err="not signed in", ms=int((time.time()-t0)*1000))
             return self.send_json(401, {"error": {"message": "not signed in — open / and connect ChatGPT (device login)", "type": "login_required"}})
 
+        if model.split(":")[0] in env.ALT_PROVIDERS or model in ("openai-fast", "openai", "gpt-oss", "gpt-oss-20b"):
+            got = alt_chat(model, body, stream)
+            if got:
+                code, raw = got
+                ms = int((time.time()-t0)*1000)
+                tin=tout=0
+                try:
+                    j=json.loads(raw); u=j.get("usage") or {}
+                    tin=u.get("prompt_tokens") or 0; tout=u.get("completion_tokens") or 0
+                except Exception: pass
+                note(model, "free", code, tin, tout, err=None if code<400 else raw.decode(errors="replace")[:200], ms=ms)
+                return self.send_raw(code or 502, raw, "text/event-stream" if stream else "application/json")
         if tier in ("free", "premium") and backend == "milq":
             got = provider_chat(model, body, stream)
             if got:

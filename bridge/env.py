@@ -90,3 +90,41 @@ def oai_model(m):
                      "api_format": m["api_format"], "context_window": m["context_window"],
                      "accepts_images": m["accepts_images"], "is_default": m["is_default"],
                      "backend": m["backend"]}}
+
+# ---------------- ALT free providers (bridge-added; verified reachable 2026-11-04) ----------------
+# pollinations: keyless anonymous tier, OpenAI-compatible (live-tested HTTP 200).
+# The rest need a FREE browser signup key (no card) and are surfaced only when a key is present.
+ALT_PROVIDERS = {
+    "pollinations": {"base": "https://text.pollinations.ai/openai", "key_env": None, "auth": "none", "path": "",
+                     "models": [{"id": "openai-fast", "name": "GPT-OSS 20B — keyless free", "ctx": 128000}]},
+    "cerebras": {"base": "https://api.cerebras.ai/v1", "key_env": "CEREBRAS_API_KEY", "auth": "bearer",
+                 "models": [{"id": "cerebras:qwen-3-235b", "name": "Qwen3 235B (ultra-fast)", "ctx": 128000},
+                            {"id": "cerebras:llama-3.1-8b", "name": "Llama 3.1 8B", "ctx": 128000}]},
+    "deepinfra": {"base": "https://api.deepinfra.com/v1/openai", "key_env": "DEEPINFRA_API_KEY", "auth": "bearer",
+                  "models": [{"id": "deepinfra:deepseek-ai/DeepSeek-V3", "name": "DeepSeek V3", "ctx": 128000},
+                             {"id": "deepinfra:meta-llama/Llama-3.3-70B-Instruct", "name": "Llama 3.3 70B", "ctx": 128000}]},
+    "groq": {"base": "https://api.groq.com/openai/v1", "key_env": "GROQ_API_KEY", "auth": "bearer",
+             "models": [{"id": "groq:gpt-oss-120b", "name": "GPT-OSS 120B", "ctx": 128000},
+                        {"id": "groq:llama-3.3-70b-versatile", "name": "Llama 3.3 70B", "ctx": 128000}]},
+    "openrouter": {"base": "https://openrouter.ai/api/v1", "key_env": "OPENROUTER_API_KEY", "auth": "bearer",
+                   "models": [{"id": "openrouter:deepseek/deepseek-chat-v3.1:free", "name": "DeepSeek V3.1 :free", "ctx": 164000},
+                              {"id": "openrouter:z-ai/glm-4.5-air:free", "name": "GLM 4.5 Air :free", "ctx": 128000}]},
+    "google": {"base": "https://generativelanguage.googleapis.com/v1beta/openai", "key_env": "GOOGLE_API_KEY", "auth": "bearer",
+               "models": [{"id": "google:gemini-2.0-flash", "name": "Gemini 2.0 Flash", "ctx": 1000000}]},
+}
+
+def alt_models(available_keys):
+    """Model dicts for providers whose key is present (pollinations always)."""
+    out = []
+    for prov, cfg in ALT_PROVIDERS.items():
+        env_key = cfg.get("key_env")
+        if env_key and not available_keys.get(env_key):
+            continue
+        for m in cfg["models"]:
+            out.append({"id": m["id"], "object": "model", "created": 1760000000,
+                        "owned_by": prov,
+                        "milq": {"tier": "free", "display": m["name"], "mode": "agent",
+                                 "api_format": "chat_completions", "context_window": m["ctx"],
+                                 "accepts_images": False, "is_default": False,
+                                 "backend": "alt:" + prov}})
+    return out
