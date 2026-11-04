@@ -10,7 +10,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import env
-from codex_auth import CodexLogin, GoogleLogin, http_json, jwt_claims
+from codex_auth import CodexLogin, GoogleLogin, SqimLogin, http_json, jwt_claims
 
 DATA_DIR   = os.environ.get("BRIDGE_DATA", os.path.expanduser("~/.milq-bridge"))
 STORE      = os.path.join(DATA_DIR, "codex_tokens.json")
@@ -29,6 +29,8 @@ else:
 
 CODEX = CodexLogin(STORE)
 GOOG  = GoogleLogin(CODEX.tokens, PORT)
+SQIM  = SqimLogin(CODEX.tokens, f"http://{HOST}:{PORT}")
+SQIM_PROBE = {"ran": False, "result": None}
 
 # ---------------- FreeMilk (milq) import: catalog + appcheck + session ----------------
 MILQ = {"catalog": None, "configs": None, "tokens": {}, "appcheck": None,
@@ -440,6 +442,26 @@ class H(BaseHTTPRequestHandler):
         if p in ("/mock", "/mock/"):
             q = urllib.parse.parse_qs(self.path.split("?")[1] if "?" in self.path else "")
             return self.send_json(200, {"mock": "ok", "model": (q.get("model") or ["?"])[0]})
+        if p == "/sqim/callback":
+            q = urllib.parse.parse_qs(self.path.split("?")[1] if "?" in self.path else "")
+            code = (q.get("code") or [""])[0]; state = (q.get("state") or [""])[0]
+            if not code:
+                errq = (q.get("error") or ["cancelled"])[0]
+                return self.send_raw(200, f"<html><body style='background:#020617;color:#F8FAFC;font-family:monospace;padding:40px'><h2>Sign-in {errq}</h2><p>Close this tab.</p></body></html>".encode(), "text/html; charset=utf-8")
+            ok, info = SQIM.callback(code, state)
+            if ok:
+                CODEX._save()
+                global SQIM_PROBE
+                SQIM_PROBE = {"ran": True, "result": SQIM.probe()}
+                save_milq()
+                return self.send_raw(200, ("<html><body style='background:#020617;color:#F8FAFC;font-family:monospace;padding:40px'>"
+                    "<h2 style='color:#22C55E'>✓ Signed in to Milq (Sqim web login)</h2>"
+                    f"<pre>{json.dumps(SQIM_PROBE['result'], indent=1)[:3000]}</pre>"
+                    "<p>Return to the bridge — the Agents tab now carries this session. Close this tab.</p></body></html>").encode(), "text/html; charset=utf-8")
+            return self.send_raw(200, f"<html><body style='background:#020617;color:#EF4444;font-family:monospace;padding:40px'><h2>Sign-in failed</h2><pre>{str(info)[:800]}</pre></body></html>".encode(), "text/html; charset=utf-8")
+        if p == "/login/sqim/status":
+            d = SQIM.status(); d["probe"] = SQIM_PROBE
+            return self.send_json(200, d)
         if p == "/milq/status":
             if not authed(self.headers): return self.send_json(401, err("invalid key"))
             summ = MILQ.get("summary") or {}
@@ -450,7 +472,8 @@ class H(BaseHTTPRequestHandler):
                                         "sips": MILQ.get("sips"),
                                         "account_summary": {"status": summ.get("status"), "ok": (summ.get("data") or {}).get("user") is not None} if summ else None,
                                         "imported_at": MILQ.get("imported_at"),
-                                        "providers": len(MILQ.get("providers") or [])})
+                                        "providers": len(MILQ.get("providers") or []),
+                                        "sqim": bool(SQIM.tokens.get("access_token"))})
         if p == "/milq/refresh":
             if not authed(self.headers): return self.send_json(401, err("invalid key"))
             st, det = fetch_milq_models()
@@ -547,6 +570,13 @@ class H(BaseHTTPRequestHandler):
             if not authed(self.headers): return self.send_json(401, err("invalid key"))
             st, det = refresh_milq_tokens()
             return self.send_json(200 if st == 200 else st or 502, det)
+        if p == "/login/sqim/start":
+            return self.send_json(200, SQIM.start())
+        if p == "/login/sqim/probe":
+            if not authed(self.headers): return self.send_json(401, err("invalid key"))
+            global SQIM_PROBE
+            SQIM_PROBE = {"ran": True, "result": SQIM.probe()}
+            return self.send_json(200, SQIM_PROBE)
         if p in ("/login/codex/start", "/v1/login/codex/start"):
             return self.send_json(200, CODEX.start())
         if p in ("/login/google/start",):

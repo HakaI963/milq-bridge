@@ -139,6 +139,15 @@ a{color:var(--blue)}
       <pre class="out" id="fr-out" hidden></pre>
     </div>
 
+    <div class="card" id="sqim-card">
+      <h2>🔑 Milq web sign-in — no iPhone, no attestation</h2>
+      <p class="note">Found in Milq's own desktop CLI (github.com/milq-ai): <b>api.sqim.dev</b> serves a plain Google sign-in that hands ONE-TIME CODES back to this bridge — the same login Milq's Sqim CLI uses, no App Attest gate. Sign in, and the bridge probes what the token unlocks (build service + the model catalog attempt on api.milq.ai).</p>
+      <div class="row"><button class="btn" id="sq-start">Sign in with Google (Milq)</button>
+        <button class="btn ghost" id="sq-probe">Re-probe token</button>
+        <span id="sq-state" class="pill">idle</span></div>
+      <pre class="out" id="sq-out" hidden></pre>
+    </div>
+
     <div class="card okbox">
       <h2>⚡ Instant free models — no account, no key</h2>
       <p class="note">Live now through the bridge: keyless OpenAI-compatible backends discovered in the “full internet” hunt (FreeMilk itself is iOS-signup-locked). Tap Test — works from any agent with just the bridge URL.</p>
@@ -256,6 +265,15 @@ $('#ak-save').onclick=async()=>{
   for(const [p,id] of Object.entries(map)){const v=$('#'+id).value.trim();if(v)alt_keys[p]=v;}
   if(!Object.keys(alt_keys).length)return toast('paste at least one key',false);
   const r=await POST('/settings',{alt_keys});$('#ak-out').hidden=false;$('#ak-out').textContent=JSON.stringify(r.json)+' — models refresh below';refreshAll();};
+async function sqRefresh(){
+  const st=await GET('/login/sqim/status'); const d=st.json;
+  const pill=$('#sq-state'); pill.textContent = d.signed_in? 'signed in ✓' : (d.stage==='waiting'?'waiting for browser…':d.stage);
+  pill.className='pill '+(d.signed_in?'ok':(d.error?'bad':'warn'));
+  if(d.error) pill.title=d.error;
+  if(d.probe&&d.probe.ran){$('#sq-out').hidden=false;$('#sq-out').textContent=JSON.stringify(d.probe.result,null,1);}
+}
+$('#sq-start').onclick=async()=>{const r=await POST('/login/sqim/start');if(r.json.login_url){window.open(r.json.login_url,'_blank');}sqRefresh();setInterval(sqRefresh,3000);};
+$('#sq-probe').onclick=async()=>{const r=await POST('/login/sqim/probe');$('#sq-out').hidden=false;$('#sq-out').textContent=JSON.stringify(r.json,null,1);refreshAll();};
 function renderModels(){
   const g=$('#grid');const list=MODELS.filter(m=>!TIER||(m.milq&&m.milq.tier===TIER));
   g.innerHTML=list.map(m=>{const q=m.milq||{};const t=q.tier||'free';

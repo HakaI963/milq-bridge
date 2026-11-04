@@ -128,3 +128,14 @@ def alt_models(available_keys):
                                  "accepts_images": False, "is_default": False,
                                  "backend": "alt:" + prov}})
     return out
+
+# ---------------- Sqim (Milq's own desktop CLI service) — web login, NO attestation ----------------
+# Discovered 2026-11-04 via github.com/milq-ai (homebrew-tap -> sqim-cli-releases Mach-O strings).
+SQIM_BASE        = "https://api.sqim.dev"
+SQIM_LOGIN_URL   = SQIM_BASE + "/auth/login"
+SQIM_EXCHANGE    = SQIM_BASE + "/auth/exchange"
+SQIM_REFRESH     = SQIM_BASE + "/auth/refresh"
+SQIM_CODES       = SQIM_BASE + "/sqim/auth/codes"
+SQIM_BUILDS      = SQIM_BASE + "/sqim/builds"
+SQIM_RUNTIME_XCODE = SQIM_BASE + "/runtime/xcode-instances"
+SQIM_GIS_CLIENT  = "964988081476-nsunhd7cqpjf58no2m6igcvscuv1ddeq.apps.googleusercontent.com"

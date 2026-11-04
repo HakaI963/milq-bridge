@@ -57,3 +57,7 @@ curl -X POST http://127.0.0.1:11434/v1/chat/completions \
 → "351"   (verified live: HTTP 200 + SSE streaming + usage counts)
 ```
 FreeMilk itself is iOS-signup/attestation-locked (App Store: seller *Milq Incorporated*, "free…funded by ads…daily allowance" — no web/Android client exists; docs/REVERSE.md §v1.2). If you ever get one-time access to a logged-in iOS session, the import pipeline lights its exact catalog too.
+
+
+## 🔑 Milq web sign-in (v1.3) — the no-iPhone door
+Discovered via Milq's official `sqim` CLI (github.com/milq-ai): **api.sqim.dev runs an attestation-free Google sign-in that returns one-time codes to a localhost callback** — the bridge now *is* that CLI. Free Models tab → "Sign in with Google (Milq)" → after approval the bridge holds a real Milq token and auto-probes every service it unlocks (build machines, install links, and a catalog attempt on api.milq.ai). Results are shown verbatim — no pretending.

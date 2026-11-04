@@ -279,6 +279,28 @@ class BridgeTests(unittest.TestCase):
                              {"model": "cerebras:qwen-3-235b", "messages": [{"role": "user", "content": "x"}]})
         self.assertEqual(st2, 402)
 
+    def test_sqim_login_flow(self):
+        # start -> url with localhost callback + state; callback exchange; probe recorded
+        self.fake.script["api.sqim.dev/auth/exchange"] = (200, {"access_token": "sq-at", "refresh_token": "sq-rt",
+                                                                  "expires_in": 86400, "email": "me@x.y"})
+        self.fake.script["api.sqim.dev/sqim/builds"] = (200, {"builds": []})
+        self.fake.script["api.sqim.dev/runtime/xcode-instances"] = (200, {"instances": []})
+        self.fake.script["api.milq.ai/auth/models"] = (403, {"detail": "This client is not supported. Please use the Milq iOS app."})
+        self.fake.script["api.milq.ai/auth/me"] = (403, {"detail": "x"})
+        self.fake.script["api.milq.ai/auth/configs"] = (403, {"detail": "x"})
+        st = S.SQIM.start()
+        self.assertEqual(st["stage"], "waiting")
+        self.assertIn("api.sqim.dev/auth/login", st["login_url"])
+        self.assertIn("/sqim/callback", st["login_url"])
+        ok, info = S.SQIM.callback("CODE-123", st["state"]["state"] if "state" in st else S.SQIM.state.get("state"))
+        self.assertTrue(ok, str(info))
+        self.assertEqual(S.SQIM.tokens.get("access_token"), "sq-at")
+        status = S.SQIM.status()
+        self.assertTrue(status["signed_in"])
+        probe = S.SQIM.probe()
+        self.assertEqual(probe["sqim_builds"]["status"], 200)
+        self.assertEqual(probe["milq_auth_models"]["status"], 403)
+
     # ---- usage counters ----
     def test_usage_tracks_everything(self):
         st, raw = self.req("GET", "/usage")
