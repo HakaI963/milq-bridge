@@ -301,6 +301,34 @@ class BridgeTests(unittest.TestCase):
         self.assertEqual(probe["sqim_builds"]["status"], 200)
         self.assertEqual(probe["milq_auth_models"]["status"], 403)
 
+    def test_har_import(self):
+        def h(name, val): return {"name": name, "value": val}
+        catalog = {"freeModels": {"models": [{"id": "gpt-6-astra", "name": "Astra", "tier": "free",
+                                              "apiFormat": "chat_completions",
+                                              "baseUrl": "http://127.0.0.1:9/mm", "apiKey": "sk-live",
+                                              "contextWindow": 400000}]}}
+        har = {"log": {"entries": [
+            {"request": {"url": "https://api.milq.ai/auth/models", "headers": [h("X-Firebase-AppCheck", "a.b.c"),
+                                                                              h("Authorization", "Bearer milqtok")],
+                         "method": "GET"},
+             "response": {"status": 200, "content": {"text": json.dumps(catalog)}}},
+            {"request": {"url": "https://router.milq.net/v1/chat/completions", "method": "POST",
+                         "headers": [h("Authorization", "Bearer prov-key"), h("X-Route", "milq")],
+                         "postData": {"text": json.dumps({"model": "gpt-6-sol", "messages": []})}},
+             "response": {"status": 200, "content": {"text": "{}"}}},
+        ]}}
+        st, raw = self.req("POST", "/import/har", har)
+        self.assertEqual(st, 200)
+        j = json.loads(raw)
+        self.assertTrue(j["appcheck"] and j["bearer"])
+        self.assertGreaterEqual(j.get("catalog_models", 0), 1)
+        st2, raw2 = self.req("GET", "/milq/status")
+        s2 = json.loads(raw2)
+        self.assertTrue(s2["has_appcheck"])
+        # teardown isolation
+        S.MILQ.update({"catalog": None, "tokens": {}, "appcheck": None, "providers": [], "providers_hints": []})
+        S.CATALOG = {}; S.refresh_catalog()
+
     # ---- usage counters ----
     def test_usage_tracks_everything(self):
         st, raw = self.req("GET", "/usage")

@@ -277,6 +277,20 @@ class SqimLogin:
             return 200, {"ok": True}
         return st, {"detail": raw[:300].decode(errors="replace")}
 
+    def fetch_configs(self, channel="stable"):
+        """GET /auth/configs on sqim.dev with our desktop token — the Milq provider
+        configs (model catalog + per-model baseUrl/apiKey/headers). 200 => feed into bridge."""
+        tok = self.tokens.get("access_token")
+        if not tok:
+            return 400, {"error": "not signed in"}
+        st, raw = http_json("GET", env.SQIM_BASE + "/auth/configs?build_channel=" + channel,
+                            headers={"Authorization": "Bearer " + tok, "Accept": "application/json"}, timeout=20)
+        try:
+            j = json.loads(raw)
+        except Exception:
+            j = {"detail": raw[:200].decode(errors="replace")}
+        return st, j
+
     def probe(self):
         """What does the sqim bearer unlock? Check sqim build surface + try milq.ai chat catalog."""
         out = {}
@@ -300,3 +314,6 @@ class SqimLogin:
         if self.tokens.get("email") or self.tokens.get("user"):
             s["who"] = self.tokens.get("email") or (self.tokens.get("user") or {}).get("email") if isinstance(self.tokens.get("user"), dict) else self.tokens.get("email") or "signed in"
         return s
+
+
+    # NOTE: appended below (class continues) — see patcher

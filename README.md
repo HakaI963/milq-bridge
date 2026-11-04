@@ -61,3 +61,8 @@ FreeMilk itself is iOS-signup/attestation-locked (App Store: seller *Milq Incorp
 
 ## 🔑 Milq web sign-in (v1.3) — the no-iPhone door
 Discovered via Milq's official `sqim` CLI (github.com/milq-ai): **api.sqim.dev runs an attestation-free Google sign-in that returns one-time codes to a localhost callback** — the bridge now *is* that CLI. Free Models tab → "Sign in with Google (Milq)" → after approval the bridge holds a real Milq token and auto-probes every service it unlocks (build machines, install links, and a catalog attempt on api.milq.ai). Results are shown verbatim — no pretending.
+
+
+## 📥 v1.4 — the two remaining doors to FreeMilk's own catalog
+1. **Borrowed-iPhone capture (free, no PC)** — `docs/CAPTURE_IPHONE.md`: ProxyPin on any iPhone → sign into FreeMilk with your (already existing, bridge-created) account → export HAR → **Free Models → Import HAR**. Every free model flips to **LIVE** in the bridge.
+2. **Sqim subscription (paid IAP)** — with any subscription on your account, **Load provider configs** pulls the same catalog through the desktop API — verified live: the endpoint answers `402 subscription_required` today, and flips to the catalog payload the moment entitlement exists. Your token already provisions their remote Macs (sandbox created+released during testing — proof of full desktop privilege).

@@ -60,3 +60,11 @@ Remaining hard limit (documented, not hidden): **premium hosted models need the 
 - Same host serves: `/sqim/builds`, `/runtime/xcode-instances`, `/runtime/assets`, `build.sqim.dev/sqim/install/<token>` (this is the remote-Mac build service the FreeMilk app itself uses — App Store description: "builds everything in the cloud using a remote Mac environment").
 - api.milq.ai `/auth/*` still answers 403 for non-iOS clients regardless of headers (App Attest middleware confirmed), but the **bridge now performs the Sqim web login itself** (`/login/sqim/*`, `/sqim/callback`) and auto-probes what the resulting Milq token unlocks, including one honest attempt at the model catalog with the token + `X-Client-Type: sqim-cli`.
 - Sqim sign-in is browser-only (any Google account; the page is Milq's own web signup-capable flow) — **this is the "no iPhone" door into Milq's account infrastructure**. Whether the Milq-Sqim token maps to the FreeMilk user (their account rows share `milq_username`) is exactly what the probe measures; results land in the Free Models tab for any user to see.
+
+
+## v1.4 — live verification of the user's Milq session (2026-11-04)
+- Sqim web login created a REAL account instantly, no app gate: `/auth/me` 200 (user id/email/created_at). The bridge persists it (0600) and refreshes.
+- Provider configs (the model catalog): **402 `subscription_required` on all channels** (`stable/ios/simulator/iphoneos/…` × with token) — desktop door is paywalled with IAP product `com.milq.sqim.basic.weekly3` (`/sqim/subscription/config`, status `active:false`).
+- **api.milq.ai runtime routes are NOT appcheck-gated** (405 vs 403 difference) — the same token provisions a live remote Mac: `POST /runtime/xcode-instances` → 200 `sandbox_uswb_…` + `api_url` (limrun.net) + `token` + websocket endpoint (proves real account privileges; instance released immediately: `{"deleted":true}`).
+- `/auth/skills/{id}` exists but this account has none provisioned (404 named-skill responses — auth middleware ran, routes real).
+- Conclusion & only remaining path to FreeMilk's own FREE models: one attested iOS session observation → catalog + per-model provider keys; captured once, works from the bridge thereafter. Docs: `docs/CAPTURE_IPHONE.md` (ProxyPin, zero PC). Bridge: `POST /import/har` + `POST /login/sqim/configs` wired, 18/18 tests.

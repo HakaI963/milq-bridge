@@ -346,6 +346,71 @@ def stream_url(url, headers, body, on_status):
     on_status(resp.status)
     yield ("stream", resp)
 
+
+def import_har(har):
+    """Parse a HAR export captured on any iPhone running the real FreeMilk app
+    (ProxyPin / mitm). Extracts: App Check header, milq bearer tokens, the
+    /auth/models catalog, provider baseUrl+keys from live chat calls."""
+    out = {"appcheck": False, "bearer": False, "catalog_entries": 0, "provider_calls": 0, "notes": []}
+    entries = ((har or {}).get("log") or {}).get("entries") or []
+    best_catalog, best_len = None, 0
+    for e in entries:
+        req = e.get("request") or {}; res = e.get("response") or {}
+        url = req.get("url") or ""
+        hdrs = {h.get("name", "").lower(): h.get("value", "") for h in req.get("headers") or []}
+        if hdrs.get("x-firebase-appcheck", "").count(".") == 2:
+            MILQ["appcheck"] = hdrs["x-firebase-appcheck"]; out["appcheck"] = True
+        if "api.milq.ai" in url:
+            auth = hdrs.get("authorization", "")
+            if auth.lower().startswith("bearer ") and auth[7:].strip():
+                MILQ.setdefault("tokens", {})["access_token"] = auth[7:].strip()
+                out["bearer"] = True
+            path = url.split("?")[0]
+            if path.endswith(("/auth/models", "/auth/configs")) and (res.get("status") or 0) == 200:
+                txt = (res.get("content") or {}).get("text") or ""
+                try:
+                    cand = json.loads(txt)
+                except Exception:
+                    cand = None
+                if cand and len(txt) > best_len:
+                    best_catalog, best_len = cand, len(txt)
+                    out["catalog_entries"] += 1
+        else:
+            path = url.split("?")[0]
+            if path.endswith("/chat/completions") or path.endswith("/responses") or path.endswith("/messages"):
+                base = path[: -(len("/chat/completions") if path.endswith("/chat/completions") else (len("/responses") if path.endswith("/responses") else len("/messages")))].rstrip("/")
+                kv = {}
+                a = hdrs.get("authorization", "")
+                if a.lower().startswith("bearer "): kv["apiKey"] = a[7:]
+                if hdrs.get("x-api-key"): kv["apiKey"] = hdrs["x-api-key"]
+                extra = {k: v for k, v in hdrs.items() if k.startswith("x-") and k not in ("x-api-key",)}
+                mdl = None
+                try:
+                    post = (req.get("postData") or {}).get("text") or ""
+                    mdl = json.loads(post).get("model") if post else None
+                except Exception:
+                    pass
+                if base and (kv.get("apiKey") or extra):
+                    MILQ.setdefault("providers_hints", []).append({"base": base, "model": mdl, **kv, "headers": extra})
+                    out["provider_calls"] += 1
+                    if best_catalog is None: best_catalog = {"models": []}
+                    if isinstance(best_catalog, dict):
+                        best_catalog.setdefault("freeModels", {"models": []})["models"].append(
+                            {"id": mdl or base, "name": (mdl or base), "tier": "free", "apiFormat": "chat_completions",
+                             "baseUrl": base, "apiKey": kv.get("apiKey"), "headers": extra})
+    if best_catalog:
+        MILQ["catalog"] = best_catalog
+        MILQ["imported_at"] = int(time.time())
+        refresh_catalog(); save_milq()
+        out["catalog_models"] = len(CATALOG)
+        out["notes"].append("catalog imported -> free models route through captured provider keys")
+    elif entries:
+        out["notes"].append("no /auth/models response found in HAR; open FreeMilk once WITH the proxy on (model list fetch happens at app start), re-export, re-import")
+    else:
+        out["notes"].append("empty/no HAR entries")
+    save_milq()
+    return out
+
 class H(BaseHTTPRequestHandler):
     server_version = "MilqBridge/1.0"
     def log_message(self, f, *a):
@@ -572,6 +637,23 @@ class H(BaseHTTPRequestHandler):
             return self.send_json(200 if st == 200 else st or 502, det)
         if p == "/login/sqim/start":
             return self.send_json(200, SQIM.start())
+        if p == "/login/sqim/configs":
+            if not authed(self.headers): return self.send_json(401, err("invalid key"))
+            ch = body.get("channel") or "stable"
+            st, j = SQIM.fetch_configs(ch)
+            if st == 200 and isinstance(j, dict) and (j.get("models") or j.get("freeModels") or j.get("premiumModels")):
+                MILQ["catalog"] = j
+                MILQ["imported_at"] = int(time.time())
+                refresh_catalog(); save_milq()
+                return self.send_json(200, {"ok": True, "source": "sqim-provider-configs", "channel": ch,
+                                            "catalog_models": len(CATALOG), "tiered": {"free": sum(1 for v in CATALOG.values() if v.get("tier")=="free"), "premium": sum(1 for v in CATALOG.values() if v.get("tier")=="premium")}})
+            return self.send_json(200 if st == 200 else st or 502, {"ok": False, "channel": ch, "response": j})
+        if p == "/import/har":
+            ip = self.client_address[0]
+            if not (ip.startswith("127.") or ip.startswith("::1") or os.environ.get("BRIDGE_LAN") == "1"):
+                return self.send_json(403, err("import only from loopback or BRIDGE_LAN=1"))
+            rep = import_har(body)
+            return self.send_json(200, rep)
         if p == "/login/sqim/probe":
             if not authed(self.headers): return self.send_json(401, err("invalid key"))
             global SQIM_PROBE

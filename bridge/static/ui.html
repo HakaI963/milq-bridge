@@ -145,6 +145,12 @@ a{color:var(--blue)}
       <div class="row"><button class="btn" id="sq-start">Sign in with Google (Milq)</button>
         <button class="btn ghost" id="sq-probe">Re-probe token</button>
         <span id="sq-state" class="pill">idle</span></div>
+      <div class="row">
+        <button class="btn blue" id="cfg-load">Load provider configs</button>
+        <input type="file" id="har-file" accept=".har,.json,application/json" style="max-width:220px">
+        <button class="btn ghost" id="har-send">Import HAR</button>
+      </div>
+      <p class="note">Provider configs = the model catalog — live-probed with your session: <b>402 subscription_required</b> (their desktop door is paid IAP). HAR import = the ad-funded iOS catalog from any borrowed iPhone — <a href="https://github.com/HakaI963/milq-bridge/blob/main/docs/CAPTURE_IPHONE.md" target="_blank" rel="noopener">step-by-step, no PC needed</a>. Both feed the same catalog → every model appears in Models tab as <b>LIVE</b>.</p>
       <pre class="out" id="sq-out" hidden></pre>
     </div>
 
@@ -273,6 +279,12 @@ async function sqRefresh(){
   if(d.probe&&d.probe.ran){$('#sq-out').hidden=false;$('#sq-out').textContent=JSON.stringify(d.probe.result,null,1);}
 }
 $('#sq-start').onclick=async()=>{const r=await POST('/login/sqim/start');if(r.json.login_url){window.open(r.json.login_url,'_blank');}sqRefresh();setInterval(sqRefresh,3000);};
+$('#cfg-load').onclick=async()=>{const o=$('#sq-out');o.hidden=false;o.textContent='loading provider configs…';
+  const r=await POST('/login/sqim/configs',{channel:'stable'});o.textContent=JSON.stringify(r.json,null,1).slice(0,2500);refreshAll();};
+$('#har-send').onclick=async()=>{const f=$('#har-file').files[0];if(!f)return toast('choose a .har file',false);
+  const o=$('#sq-out');o.hidden=false;o.textContent='parsing HAR…';
+  f.text().then(txt=>{let j=null;try{j=JSON.parse(txt)}catch(e){return(o.textContent='bad HAR json: '+e.message)}
+   POST('/import/har',j).then(r=>{o.textContent=JSON.stringify(r.json,null,1);refreshAll();toast(r.json.catalog_models?('catalog: '+r.json.catalog_models+' models'):'no catalog yet — see notes');});});};
 $('#sq-probe').onclick=async()=>{const r=await POST('/login/sqim/probe');$('#sq-out').hidden=false;$('#sq-out').textContent=JSON.stringify(r.json,null,1);refreshAll();};
 function renderModels(){
   const g=$('#grid');const list=MODELS.filter(m=>!TIER||(m.milq&&m.milq.tier===TIER));
