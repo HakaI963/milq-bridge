@@ -2,136 +2,265 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>MilqBridge — FreeMilk OpenAI API</title>
-<link rel="stylesheet" href="/ui.css">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#020617">
+<title>MilqBridge — FreeMilk free models for any agent</title>
+<style>
+:root{
+ --bg:#020617;--card:#0E1223;--card2:#131A2E;--ink:#F8FAFC;--mut:#94A3B8;--line:#334155;
+ --green:#22C55E;--blue:#38BDF8;--amber:#F59E0B;--red:#EF4444;
+ --mono:"JetBrains Mono",ui-monospace,Menlo,Consolas,monospace;--sans:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+*{box-sizing:border-box}html,body{margin:0;padding:0}
+body{background:
+ radial-gradient(900px 500px at 85% -10%,rgba(34,197,94,.08),transparent 60%),
+ radial-gradient(700px 400px at -10% 15%,rgba(56,189,248,.07),transparent 60%),var(--bg);
+ color:var(--ink);font:15px/1.5 var(--sans);padding-bottom:calc(76px + env(safe-area-inset-bottom))}
+code,pre,.mono{font-family:var(--mono)}
+.wrap{max-width:1060px;margin:0 auto;padding:18px 14px 30px}
+.top{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:6px}
+.logo{width:40px;height:40px;border-radius:12px;border:2px solid var(--green);display:grid;place-items:center;font-family:var(--mono);color:var(--green);font-weight:700}
+h1{font:700 20px/1.2 var(--mono);margin:0}
+.sub{color:var(--mut);font-size:13px}
+.pills{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0}
+.pill{font:12px var(--mono);border:1px solid var(--line);border-radius:999px;padding:6px 12px;color:var(--mut)}
+.pill b{color:var(--ink)}
+.pill.ok b{color:var(--green)}.pill.bad b{color:var(--red)}.pill.warn b{color:var(--amber)}
+/* NAV — big, always visible */
+nav{position:fixed;bottom:0;left:0;right:0;z-index:40;display:flex;background:linear-gradient(180deg,#0B0F1E,#0E1223);border-top:1px solid var(--line);padding:6px 4px calc(6px + env(safe-area-inset-bottom))}
+nav button{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;background:transparent!important;border:none!important;color:var(--mut);font:600 11.5px var(--sans);padding:10px 4px;border-radius:12px;cursor:pointer;min-height:58px}
+nav button svg{width:22px;height:22px}
+nav button.on{color:var(--green);background:rgba(34,197,94,.12)!important}
+nav button:hover,nav button:focus-visible{color:var(--ink);outline:2px solid var(--green);outline-offset:-2px}
+@media(min-width:900px){nav{position:static;background:transparent;border:none;padding:0;margin-bottom:14px}
+ nav button{flex-direction:row;gap:8px;font-size:14px;min-height:44px;flex:0 0 auto;padding:10px 18px;border-radius:999px}}
+section{display:none}section.on{display:block}
+/* CARDS + BUTTONS — high contrast, never invisible */
+.card{background:linear-gradient(180deg,rgba(19,26,46,.75),rgba(14,18,35,.92));border:1px solid var(--line);border-radius:16px;padding:16px;margin:0 0 14px}
+.card h2{font:700 15px var(--mono);margin:0 0 10px}
+.card h3{font-size:14px;margin:14px 0 8px}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+input,select,textarea{width:100%;min-width:0;background:#080C18;color:var(--ink);border:1px solid var(--line);border-radius:12px;padding:12px 14px;font:14px var(--mono)}
+input:focus-visible,select:focus-visible,textarea:focus-visible,button:focus-visible,a:focus-visible{outline:2px solid var(--green);outline-offset:2px}
+.btn{appearance:none;cursor:pointer;border-radius:12px;padding:12px 18px;font:700 14px var(--sans);border:1px solid var(--green);background:var(--green);color:#04110A;min-height:44px;transition:filter .18s,transform .18s;text-align:center}
+.btn:hover{filter:brightness(1.1);transform:translateY(-1px)}
+.btn.ghost{background:transparent;color:var(--ink);border-color:var(--line)}
+.btn.ghost:hover{border-color:var(--green)}
+.btn.amber{background:var(--amber);border-color:var(--amber);color:#201200}
+.btn.blue{background:var(--blue);border-color:var(--blue);color:#02131F}
+.btn.big{font-size:16px;padding:16px 22px;width:100%}
+.btn.small{font:600 12px var(--sans);padding:8px 12px;min-height:36px}
+.grid{display:grid;gap:12px;grid-template-columns:repeat(auto-fill,minmax(260px,1fr))}
+.mcard{position:relative}
+.mcard .tier{position:absolute;top:12px;right:12px;font:800 10px var(--mono);letter-spacing:.06em;padding:4px 10px;border-radius:999px}
+.tier.free{background:rgba(34,197,94,.15);color:var(--green)}
+.tier.plan{background:rgba(56,189,248,.15);color:var(--blue)}
+.tier.premium{background:rgba(245,158,11,.15);color:var(--amber)}
+.mid{font:12px var(--mono);color:var(--mut);word-break:break-all;margin:2px 0 6px}
+.mmeta{font:12px var(--mono);color:var(--blue);margin-bottom:10px}
+.stat{font:700 30px var(--mono);color:var(--green)}
+.statl{font-size:12px;color:var(--mut)}
+pre.out{background:#04070F;border:1px solid var(--line);border-radius:12px;padding:12px;font:12px var(--mono);white-space:pre-wrap;word-break:break-word;max-height:300px;overflow:auto}
+table{width:100%;border-collapse:collapse;font:12.5px var(--mono)}
+th{color:var(--mut);text-align:left;font-weight:500;padding:7px 8px;border-bottom:1px solid var(--line)}
+td{padding:7px 8px;border-bottom:1px solid rgba(51,65,85,.4);word-break:break-word}
+.ok-c{color:var(--green)}.bad-c{color:var(--red)}.warn-c{color:var(--amber)}.mut-c{color:var(--mut)}
+.bigcode{font:700 34px var(--mono);letter-spacing:.12em;color:var(--green);text-align:center;background:#04070F;border:2px dashed var(--green);border-radius:14px;padding:18px;margin:12px 0}
+a{color:var(--blue)}
+.note{font-size:13px;color:var(--mut)}
+.okbox{border-color:rgba(34,197,94,.5)}
+.badbox{border-color:rgba(239,68,68,.5)}
+.steps li{margin:8px 0}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(92px + env(safe-area-inset-bottom));background:#101830;border:1px solid var(--green);padding:12px 18px;border-radius:14px;font-size:14px;z-index:60;max-width:92vw;box-shadow:0 10px 40px rgba(0,0,0,.6)}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
 </head>
 <body>
-<div class="app">
-  <aside class="side">
-    <div class="brand">
-      <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="#22C55E" stroke-width="2"><path d="M8 2v4M16 2v4M5 10h14M6 4h12a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z"/></svg>
-      <div><b>MilqBridge</b><span>FreeMilk → OpenAI API</span></div>
+<div class="wrap">
+  <div class="top">
+    <div class="logo">M</div>
+    <div><h1>MilqBridge</h1><div class="sub">FreeMilk's free models — OpenAI-compatible, any agent</div></div>
+  </div>
+  <div class="pills" id="pills">
+    <span class="pill">server <b class="ok-c">…</b></span>
+  </div>
+
+  <nav id="nav">
+    <button data-v="home" class="on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 11.5 12 4l9 7.5M5.5 10v9h13v-9"/></svg>Home</button>
+    <button data-v="models"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3 3 8l9 5 9-5-9-5zM3 16l9 5 9-5M3 12l9 5 9-5"/></svg>Models</button>
+    <button data-v="free"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v13m0 0-4-4m4 4 4-4M4 21h16"/></svg>Free Models</button>
+    <button data-v="usage"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18M8 15l3-4 3 2 4-6"/></svg>Usage</button>
+    <button data-v="setup"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m16 8 4 4-4 4M8 8l-4 4 4 4"/></svg>Agents</button>
+  </nav>
+
+  <!-- HOME -->
+  <section id="v-home" class="on">
+    <div class="card" id="home-status">
+      <h2>Status</h2>
+      <div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(150px,1fr))">
+        <div><div class="stat" id="h-reqs">0</div><div class="statl">requests</div></div>
+        <div><div class="stat" id="h-tokens">0</div><div class="statl">tokens</div></div>
+        <div><div class="stat" id="h-models">0</div><div class="statl">models</div></div>
+        <div><div class="stat" id="h-freecnt" style="color:var(--blue)">0</div><div class="statl">free ready</div></div>
+      </div>
+      <div class="row" style="margin-top:12px">
+        <button class="btn ghost" onclick="refreshAll()">Refresh</button>
+      </div>
     </div>
-    <nav id="nav">
-      <button data-view="overview" class="on"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="9"/><rect x="14" y="3" width="7" height="5"/><rect x="14" y="12" width="7" height="9"/><rect x="3" y="16" width="7" height="5"/></svg>Overview</button>
-      <button data-view="login"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4M10 17l5-5-5-5M15 12H3"/></svg>Login</button>
-      <button data-view="models"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2 2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>Models</button>
-      <button data-view="usage"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18M7 14l4-4 3 3 5-6"/></svg>Usage & Status</button>
-      <button data-view="agent"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="m16 18 6-6-6-6M8 6l-6 6 6 6"/></svg>Agent setup</button>
-    </nav>
-    <div class="side-foot">
-      <div id="side-plan" class="planchip">ChatGPT: not connected</div>
+    <div class="card">
+      <h2>Quick test</h2>
+      <div class="row"><input id="q-prompt" value="Say OK in one word." placeholder="message…"></div>
+      <div class="row"><select id="q-model"></select>
+        <button class="btn" id="q-run">Send</button></div>
+      <pre class="out" id="q-out" hidden></pre>
     </div>
-  </aside>
+  </section>
 
-  <main class="main">
-    <!-- OVERVIEW -->
-    <section id="view-overview" class="view on">
-      <header><h1>Overview</h1><p>FreeMilk models behind one OpenAI-compatible endpoint.</p></header>
-      <div class="grid g3">
-        <div class="card"><div class="stat"><b id="ov-reqs">0</b><span>requests</span></div></div>
-        <div class="card"><div class="stat"><b id="ov-tokens">0</b><span>tokens used</span></div></div>
-        <div class="card"><div class="stat"><b id="ov-errs">0</b><span>errors</span></div></div>
+  <!-- MODELS -->
+  <section id="v-models">
+    <div class="card"><h2>Models — <span class="ok-c">free</span> / <span class="blue" style="color:var(--blue)">plan</span> / <span class="warn-c">premium</span></h2>
+      <div class="pills" id="tierchips">
+        <button class="btn small" data-t="">All</button>
+        <button class="btn small ghost" data-t="free">Free</button>
+        <button class="btn small ghost" data-t="premium">Premium</button>
       </div>
-      <div class="grid g2">
-        <div class="card">
-          <h3>Connection</h3>
-          <div class="kv"><span>API base</span><code id="ov-base"></code></div>
-          <div class="kv"><span>API key</span><code id="ov-key">…</code><button class="mini" data-copy="ov-key">copy</button></div>
-          <div class="kv"><span>FreeMilk backend</span><code>https://api.milq.ai</code></div>
-          <div class="kv"><span>ChatGPT sign-in</span><b id="ov-login" class="badge red">not connected</b></div>
-          <button class="primary" data-go="login">Connect ChatGPT</button>
-        </div>
-        <div class="card">
-          <h3>Test a model</h3>
-          <div class="row"><input id="ov-prompt" placeholder="Type a message…" value="Say OK in one word."/>
-            <select id="ov-model"></select></div>
-          <button class="primary" id="ov-run">Send request</button>
-          <pre id="ov-out" class="out" hidden></pre>
-        </div>
-      </div>
-      <div class="card">
-        <h3>Recent activity</h3>
-        <table class="tbl"><thead><tr><th>time</th><th>model</th><th>tier</th><th>status</th><th>in/out</th><th>ms</th></tr></thead><tbody id="ov-log"></tbody></table>
-      </div>
-    </section>
+      <div class="grid" id="grid"></div>
+    </div>
+  </section>
 
-    <!-- LOGIN -->
-    <section id="view-login" class="view">
-      <header><h1>Login</h1><p>Uses FreeMilk's own ChatGPT/Codex device flow — the real app environment, replicated.</p></header>
-      <div class="grid g2">
-        <div class="card">
-          <h3>1 · ChatGPT / Codex (models gpt-5-codex & premium fallback)</h3>
-          <div id="cx-idle">
-            <p class="muted">Click start — a one-time code appears; approve it in the browser page with your ChatGPT account.</p>
-            <button class="primary" id="cx-start">Start device login</button>
-          </div>
-          <div id="cx-wait" hidden>
-            <div class="codebox"><b id="cx-code">—</b></div>
-            <p class="muted">Open this and enter the code:</p>
-            <a id="cx-url" class="link" target="_blank" rel="noopener">auth.openai.com/codex/device</a>
-            <p class="muted" id="cx-state">Waiting for approval…</p>
-            <button class="mini" id="cx-copy">copy code</button>
-          </div>
-          <div id="cx-done" hidden>
-            <p class="badge green">Signed in — <span id="cx-plan"></span></p>
-            <p class="muted" id="cx-acc"></p>
-            <button class="mini" id="cx-again">Sign in again</button>
-          </div>
-          <div id="cx-err" hidden class="badge red"></div>
-        </div>
-        <div class="card">
-          <h3>2 · Google (FreeMilk account session)</h3>
-          <p class="muted">FreeMilk account login = Google identity exchanged at <code>api.milq.ai/account/auth/google</code> (field <code>identity_token</code>, verified). The mobile <code>/auth/google</code> additionally demands a device attestation from iPhones — this bridge performs the web-side exchange.</p>
-          <a id="gg-url" class="link" target="_blank" rel="noopener">Open Google consent</a>
-          <p class="muted">After approving, your browser lands on a <code>com.googleusercontent.apps…</code> URL — copy the <code>code=</code> value:</p>
-          <div class="row"><input id="gg-code" placeholder="4/0AX42C… or full callback URL"/><button id="gg-ex" class="primary">Exchange</button></div>
-          <pre id="gg-out" class="out" hidden></pre>
-        </div>
+  <!-- FREE (import + capture) -->
+  <section id="v-free">
+    <div class="card" id="free-state">
+      <h2>FreeMilk free models</h2>
+      <p class="note">FreeMilk's free catalog (GPT-6 Astra/Sol/Luna, DeepSeek V4.1 Flash, GLM 5.3 Flash) is served by their API behind an <b>Apple device attestation</b> gate — verified in the decompile (<code>docs/REVERSE.md</code>). This bridge becomes the client: it imports your own FreeMilk session + catalog once, then every free model answers through it like any OpenAI API. <span id="fs-line" class="mono"></span></p>
+      <div class="row">
+        <button class="btn" id="fr-refresh">Test free model now</button>
+        <button class="btn ghost" id="fr-reimport">Re-import catalog</button>
       </div>
-    </section>
+      <pre class="out" id="fr-out" hidden></pre>
+    </div>
 
-    <!-- MODELS -->
-    <section id="view-models" class="view">
-      <header><h1>Models</h1><p>Catalog recovered from FreeMilk's <code>HostedModels</code>: free daily (SIPS, ad-supported), ChatGPT-plan Codex, and premium.</p></header>
-      <div class="row chips" id="tierchips">
-        <button class="chip on" data-t="">All</button><button class="chip" data-t="free">Free daily</button><button class="chip" data-t="plan">ChatGPT plan</button><button class="chip" data-t="premium">Premium</button>
+    <div class="card">
+      <h2>1 · Sign in to FreeMilk (phone browser)</h2>
+      <ol class="steps">
+        <li>Open <a href="https://account.milq.ai/account" target="_blank" rel="noopener">account.milq.ai</a> and sign in with Google (or Apple).</li>
+        <li>Keep that tab; your session cookie proves the account.</li>
+      </ol>
+      <h3>2 · Import your session (two ways)</h3>
+      <p class="note"><b>Quick paste</b> — copy the <code>milq session</code> cookie value (rooted phone: any cookie viewer / browser devtools via <code>chrome://flags</code>) and send it below. <br><b>Full capture (recommended)</b> — run the Termux one-liner (below) while opening FreeMilk's pages; it auto-pushes session + catalog.</p>
+      <div class="row">
+        <input id="imp-cookie" placeholder="session cookie value (or paste captured JSON below)">
+        <button class="btn blue" id="imp-send">Import paste</button>
       </div>
-      <div class="grid g3" id="modelgrid"></div>
-    </section>
+      <div class="row"><textarea id="imp-json" rows="4" placeholder='or paste captured JSON {"catalog":…,"tokens":…}'></textarea></div>
+      <div class="row"><button class="btn blue" id="imp-json-send">Import JSON</button></div>
+      <pre class="out" id="imp-out" hidden></pre>
+    </div>
 
-    <!-- USAGE -->
-    <section id="view-usage" class="view">
-      <header><h1>Usage & Status</h1><p>Per-request status, token counts, model mix and the ChatGPT plan meter.</p></header>
-      <div class="grid g3">
-        <div class="card"><div class="stat"><b id="u-reqs">0</b><span>requests</span></div></div>
-        <div class="card"><div class="stat"><b id="u-in">0</b><span>input tokens</span></div></div>
-        <div class="card"><div class="stat"><b id="u-out">0</b><span>output tokens</span></div></div>
-      </div>
-      <div class="grid g2">
-        <div class="card"><h3>By model</h3><table class="tbl"><tbody id="u-bymodel"></tbody></table></div>
-        <div class="card"><h3>ChatGPT plan meter (wham)</h3><pre id="u-wham" class="out">—</pre></div>
-      </div>
-      <div class="card"><h3>Request log</h3><table class="tbl"><thead><tr><th>time</th><th>model</th><th>tier</th><th>status</th><th>in/out</th><th>ms</th><th>error</th></tr></thead><tbody id="u-log"></tbody></table></div>
-    </section>
+    <div class="card">
+      <h2>3 · Termux capture (one command)</h2>
+      <p class="note">In Termux on this phone — runs the proxy + auto-import; open FreeMilk-related pages (or replay app traffic if you ever mirror an iOS session) and the catalog lands here automatically.</p>
+      <pre class="out" id="cap-cmd"></pre>
+      <button class="btn small" data-copytext="cap-cmd">Copy command</button>
+      <p class="note" style="margin-top:10px">The capture tool, source: <code>capture/milq_capture.py</code>. It only reads traffic from your own device and your own account.</p>
+    </div>
+  </section>
 
-    <!-- AGENT -->
-    <section id="view-agent" class="view">
-      <header><h1>Agent setup</h1><p>Point any OpenAI-compatible agent at the bridge.</p></header>
-      <div class="card"><h3>Environment</h3>
-        <pre id="ag-env" class="out"></pre><button class="mini" data-copytext="ag-env">copy</button></div>
-      <div class="card"><h3>OpenAI Python SDK</h3>
-        <pre id="ag-py" class="out"></pre><button class="mini" data-copytext="ag-py">copy</button></div>
-      <div class="card"><h3>curl</h3>
-        <pre id="ag-curl" class="out"></pre><button class="mini" data-copytext="ag-curl">copy</button></div>
-      <div class="card"><h3>Settings (keys are stored locally, never logged)</h3>
-        <div class="row"><input id="set-oai" placeholder="OpenAI API key (optional, unlocks premium fallback)"/><button id="set-save" class="primary">Save</button></div>
-        <pre id="set-out" class="out" hidden></pre></div>
-    </section>
-  </main>
+  <!-- USAGE -->
+  <section id="v-usage">
+    <div class="card"><h2>Request status</h2>
+      <div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(150px,1fr))">
+        <div><div class="stat" id="u-reqs">0</div><div class="statl">requests</div></div>
+        <div><div class="stat" id="u-in">0</div><div class="statl">in tokens</div></div>
+        <div><div class="stat" id="u-out">0</div><div class="statl">out tokens</div></div>
+        <div><div class="stat" id="u-err" style="color:var(--red)">0</div><div class="statl">errors</div></div>
+      </div>
+    </div>
+    <div class="card"><h2>Log</h2><table><thead><tr><th>time</th><th>model</th><th>tier</th><th>status</th><th>tok</th><th>ms</th></tr></thead><tbody id="u-log"></tbody></table></div>
+  </section>
+
+  <!-- SETUP -->
+  <section id="v-setup">
+    <div class="card"><h2>Any agent — 2 lines</h2>
+      <pre class="out" id="ag-env"></pre>
+      <div class="row"><button class="btn small" data-copytext="ag-env">Copy</button></div></div>
+    <div class="card"><h2>curl</h2><pre class="out" id="ag-curl"></pre><div class="row"><button class="btn small" data-copytext="ag-curl">Copy</button></div></div>
+    <div class="card"><h2>API key</h2>
+      <div class="row"><input id="set-key" placeholder="paste bridge key if UI can't read it">
+      <button class="btn ghost" id="set-key-save">Save</button></div>
+      <p class="note">On the phone server itself the key is read automatically from <code>~/.milq-bridge/bridge_key</code>.</p></div>
+  </section>
 </div>
 <div id="toast" class="toast" hidden></div>
-<script src="/ui.js"></script>
+<script>
+const qs=new URLSearchParams(location.search);
+let KEY=localStorage.getItem('mbk')||qs.get('key')||'';
+function authH(){return KEY?{Authorization:'Bearer '+KEY}:{}}
+const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
+function toast(m,ok=true){const t=$('#toast');t.textContent=m;t.style.borderColor=ok?'var(--green)':'var(--red)';t.hidden=false;clearTimeout(t._t);t._t=setTimeout(()=>t.hidden=true,3200)}
+async function GET(p){const r=await fetch(p);return{status:r.status,json:await r.json().catch(()=>({}))}}
+async function GETA(p){const r=await fetch(p,{headers:authH()});return{status:r.status,json:await r.json().catch(()=>({}))}}
+async function POST(p,b){const r=await fetch(p,{method:'POST',headers:{'Content-Type':'application/json',...authH()},body:JSON.stringify(b||{})});return{status:r.status,json:await r.json().catch(()=>({}))}}
+// nav
+$$('#nav button').forEach(x=>x.onclick=()=>{$$('#nav button').forEach(y=>y.classList.remove('on'));x.classList.add('on');$$('section').forEach(s=>s.classList.remove('on'));$('#v-'+x.dataset.v).classList.add('on');history.replaceState(0,'','?'+qs.toString()+'&view='+x.dataset.v);});
+// key bootstrap from loopback/LAN server
+(async()=>{if(!KEY){try{const d=await GET('/local/key');if(d.json.key){KEY=d.json.key;localStorage.setItem('mbk',KEY)}}catch(e){}}if(qs.get('view')){const b=document.querySelector('[data-v='+qs.get('view')+']');if(b)b.click();}refreshAll()})();
+document.addEventListener('click',e=>{const c=e.target.closest('[data-copytext]');if(c){navigator.clipboard&&navigator.clipboard.writeText($('#'+c.dataset.copytext).textContent.trim());toast('copied')}});
+let MODELS=[],TIER='',IMPORT=null;
+async function refreshAll(){
+  const h=await GET('/health');
+  const pills=$('#pills');
+  const mi=await GETA('/milq/status'); IMPORT=mi.status===200?mi.json:null;
+  const freeReady=IMPORT&&IMPORT.catalog_models>0&&IMPORT.session&&IMPORT.has_appcheck;
+  pills.innerHTML=`<span class="pill ${h.status===200?'ok':'bad'}">server <b>${h.status===200?'up':'down'}</b></span>
+   <span class="pill ${freeReady?'ok':'warn'}">free models <b>${freeReady?'ready':'needs import'}</b></span>
+   <span class="pill">agent base <b>${location.origin}/v1</b></span>
+   <span class="pill">key <b>${KEY?KEY.slice(0,8)+'…':'?'}</b></span>`;
+  $('#fs-line').innerHTML=IMPORT?(`imported ${IMPORT.imported_at?new Date(IMPORT.imported_at*1000).toLocaleString():''} · ${IMPORT.catalog_models} catalog models · session ${IMPORT.session?'✔':'✘'} · attestation ${IMPORT.has_appcheck?'✔':'✘'}`):'';
+  const m=await GETA('/v1/models'); if(m.status===200){MODELS=m.json.data;}
+  $('#h-models').textContent=MODELS.length;
+  $('#h-freecnt').textContent=MODELS.filter(x=>x.milq&&x.milq.backend==='milq-captured').length;
+  renderModels();renderQuick();
+  const u=await GETA('/usage');if(u.status===200){const L=u.json.local;
+    $('#h-reqs').textContent=L.requests;$('#h-tokens').textContent=L.in_tokens+L.out_tokens;
+    $('#u-reqs').textContent=L.requests;$('#u-in').textContent=L.in_tokens;$('#u-out').textContent=L.out_tokens;$('#u-err').textContent=L.errors;
+    $('#u-log').innerHTML=(L.log||[]).slice(0,25).map(r=>`<tr><td>${new Date(r.ts*1000).toLocaleTimeString()}</td><td>${r.model}</td><td>${r.tier}</td><td class="${r.status<400?'ok-c':(r.status===402?'warn-c':'bad-c')}">${r.status}</td><td>${r.in}/${r.out}</td><td>${r.ms}</td></tr>`).join('');
+    $('#h-log-mini');}
+  const st=$('#ag-env');const base=location.origin+'/v1';
+  st.textContent=`export OPENAI_BASE_URL=${base}\nexport OPENAI_API_KEY=${KEY||'<see ~/.milq-bridge/bridge_key>'}`;
+  $('#ag-curl').textContent=`curl ${base}/chat/completions \\\n  -H "Authorization: Bearer ${KEY||'KEY'}" -H "Content-Type: application/json" \\\n  -d '{"model":"gpt-6-astra","messages":[{"role":"user","content":"hi"}]}'`;
+  $('#cap-cmd').textContent=`termux-setup-storage && pkg update -y && pkg install -y python git termux-services && git clone https://github.com/HakaI963/milq-bridge && cd milq-bridge && python -m pip install --user mitmproxy && BRIDGE=http://127.0.0.1:11434 ~/.local/bin/mitmdump -s capture/milq_capture.py --listen-address :: --listen-port 8080`;
+}
+function renderModels(){
+  const g=$('#grid');const list=MODELS.filter(m=>!TIER||(m.milq&&m.milq.tier===TIER));
+  g.innerHTML=list.map(m=>{const q=m.milq||{};const t=q.tier||'free';
+    const captured=q.backend==='milq-captured';
+    return `<div class="card mcard"><span class="tier ${t}">${t.toUpperCase()}${captured?' · LIVE':''}</span>
+    <h3>${q.display||m.id}</h3><div class="mid">${m.id}</div>
+    <div class="mmeta">${q.api_format||''} · ${(q.context_window||0)/1000}k ctx</div>
+    <div class="row"><button class="btn small" onclick="testOne('${m.id}')">Test</button>
+    ${t==='premium'?`<button class="btn small amber" onclick="unlock('${m.id}')">Ad-unlock 1h</button>`:''}
+    <button class="btn small ghost" onclick="navigator.clipboard&&navigator.clipboard.writeText('${m.id}');toast('id copied')">Copy id</button></div></div>`}).join('');
+  $$('#tierchips .btn').forEach(b=>b.onclick=()=>{TIER=b.dataset.t;$$('#tierchips .btn').forEach(x=>x.className='btn small ghost');b.className='btn small';renderModels();});
+}
+function renderQuick(){const s=$('#q-model');s.innerHTML=MODELS.map(m=>`<option>${m.id}</option>`).join('');}
+async function testOne(id){$('#q-model').value=id;$$('#nav button').forEach(y=>y.classList.remove('on'));$('[data-v=home]').classList.add('on');$$('section').forEach(s=>s.classList.remove('on'));$('#v-home').classList.add('on');$('#q-run').click();}
+$('#q-run').onclick=async()=>{const o=$('#q-out');o.hidden=false;o.textContent='…';
+  const r=await POST('/v1/chat/completions',{model:$('#q-model').value,messages:[{role:'user',content:$('#q-prompt').value||'hi'}],stream:false});
+  o.textContent=r.status===200&&r.json.choices?r.json.choices.map(c=>c.message.content).join(''):'HTTP '+r.status+'\n'+JSON.stringify(r.json,null,1).slice(0,800);
+  refreshAll();};
+$('#fr-refresh').onclick=async()=>{const o=$('#fr-out');o.hidden=false;o.textContent='…';
+  const r=await POST('/v1/chat/completions',{model:'gpt-6-astra',messages:[{role:'user',content:'ping from bridge'}]});
+  o.textContent='HTTP '+r.status+'\n'+(r.json.choices?r.json.choices[0].message.content:JSON.stringify(r.json,null,1).slice(0,700));refreshAll();};
+$('#fr-reimport').onclick=()=>{$$('#nav button').forEach(y=>y.classList.remove('on'));$('[data-v=free]').classList.add('on');$$('section').forEach(s=>s.classList.remove('on'));$('#v-free').classList.add('on');$('#imp-cookie').focus();};
+async function doImport(bodyObj){const o=$('#imp-out');o.hidden=false;o.textContent='importing…';
+  const r=await POST('/import/milq',bodyObj);o.textContent='HTTP '+r.status+'\n'+JSON.stringify(r.json,null,1);refreshAll();}
+$('#imp-json-send').onclick=()=>{let j;try{j=JSON.parse($('#imp-json').value)}catch(e){return toast('bad JSON',false)}doImport(j)};
+$('#imp-cookie').onchange=e=>{e.target.value=e.target.value.trim();};
+$('#imp-send').onclick=()=>{const v=$('#imp-cookie').value.trim();if(!v)return toast('paste cookie first',false);
+  // probe milq summary with the cookie server-side
+  doImport({session_cookie:v,note:'web session'}).then?.(()=>{});};
+$('#set-key-save').onclick=()=>{KEY=$('#set-key').value.trim();localStorage.setItem('mbk',KEY);toast('key saved');refreshAll();};
+setInterval(()=>{if(document.visibilityState==='visible')refreshAll();},8000);
+</script>
 </body>
 </html>

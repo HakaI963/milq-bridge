@@ -35,3 +35,14 @@ python3 tests/test_bridge.py   # 13 offline tests: UI, tiers, gates, codecs, SSE
 
 ## Known limits (documented in REVERSE.md §2/§5)
 - FreeMilk's **mobile** account API (`/auth/*` on api.milq.ai) is gated by Apple **App Attest / Firebase App Check** hardware attestation — the bridge cannot and does not fake it; premium hosted models therefore route via your ChatGPT plan or your own OpenAI key fallback. The **web** account login (`/account/auth/google`, field `identity_token`) is implemented and used for the account side.
+
+## Runs entirely on your phone (rooted or not) — no PC needed
+1. **Termux**: `pkg install -y python git && git clone https://github.com/HakaI963/milq-bridge && cd milq-bridge && BRIDGE_LAN=1 python3 bridge/server.py --port 11434`
+2. Open **http://127.0.0.1:11434** in your phone browser — full dashboard (Home · Models · Free Models · Usage · Agents). Every button has a 44px+ touch target and explicit high-contrast styling.
+3. **MilqBridge APK** (release): enter the server address + key once → same dashboard native in a WebView, with "Fetch my key" auto-detect.
+4. Any coding agent on-device or on LAN: `OPENAI_BASE_URL=http://<phone-ip>:11434/v1`, `OPENAI_API_KEY=<bridge key>`.
+
+### Free hosted models (GPT-6 Astra/Sol/Luna, DeepSeek V4.1 Flash, GLM 5.3 Flash)
+FreeMilk serves its free catalog only to device-attested iOS clients (`X-Firebase-AppCheck`, Apple App Attest — proven hardware-bound, see docs/REVERSE.md §2). The bridge therefore becomes your client: it imports **your own** FreeMilk session + catalog once (paste, or run the bundled Termux capture proxy: `capture/milq_capture.py`), and every free model answers through your account — with SIPS/plan shown and per-request usage logged. Until an import exists the UI states this plainly rather than pretending.
+
+![UI screenshots](docs/) — see `shots/` for the rendered dashboard on 412×915 (phone) and desktop.

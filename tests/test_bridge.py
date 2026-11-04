@@ -74,8 +74,14 @@ class BridgeTests(unittest.TestCase):
         self.assertEqual(st, 200)
         html = raw.decode()
         self.assertIn("MilqBridge", html)
-        for view in ("overview", "login", "models", "usage", "agent"):
-            self.assertIn(f"view-{view}", html)
+        for view in ("home", "models", "free", "usage", "setup"):
+            self.assertIn(f'id="v-{view}"', html)
+            self.assertIn(f'data-v="{view}"', html)
+        # buttons must have explicit high-contrast styling (the invisible-button bug regression guard)
+        self.assertIn("nav button{flex:1", html)
+        self.assertIn(".btn{appearance:none", html)
+        self.assertIn("min-height:44px", html)
+        self.assertIn("outline:2px solid var(--green)", html)
 
     # ---- catalog ----
     def test_models_require_key(self):
@@ -96,6 +102,9 @@ class BridgeTests(unittest.TestCase):
     # ---- auth gates ----
     def test_premium_locked_without_unlock(self):
         S.CODEX.tokens.clear()
+        S.MILQ.update({"catalog": None, "tokens": {}, "appcheck": None, "providers": []})
+        S.CATALOG = {}
+        S.refresh_catalog()
         st, raw = self.req("POST", "/v1/chat/completions",
                            {"model": "gpt-5.5", "messages": [{"role": "user", "content": "x"}]})
         self.assertEqual(st, 402)
@@ -119,6 +128,9 @@ class BridgeTests(unittest.TestCase):
 
     def test_free_requires_signin(self):
         S.CODEX.tokens.clear()
+        S.MILQ.update({"catalog": None, "tokens": {}, "appcheck": None, "providers": []})
+        S.CATALOG = {}
+        S.refresh_catalog()
         st, raw = self.req("POST", "/v1/chat/completions",
                            {"model": "gpt-6-astra", "messages": [{"role": "user", "content": "x"}]})
         # hosted milq requires attested session (documented) -> login gate for codex-backed free tier fallback
@@ -193,6 +205,62 @@ class BridgeTests(unittest.TestCase):
         self.assertTrue(body["codex_cli_simplified_flow"])
         self.assertEqual(body["code_challenge_method"], "S256")
         self.assertIn("CFNetwork", headers["User-Agent"])
+
+
+    # ---- milq import pipeline (the free-model path) ----
+    def test_import_catalog_and_route(self):
+        # clear any provider creds from previous tests so the 402 gate tests stay meaningful
+        S.CODEX.tokens.clear()
+        S.MILQ.update({"catalog": None, "tokens": {}, "appcheck": None, "providers": []})
+        S.refresh_catalog()
+        cat = {"freeModels": {"models": [
+            {"id": "gpt-6-astra", "name": "GPT-6 Astra", "tier": "free", "apiFormat": "chat_completions",
+             "baseUrl": "http://127.0.0.1:9/capture-me", "apiKey": "sk-captured", "headers": {"X-Route": "milq"},
+             "contextWindow": 400000},
+            {"id": "deepseek-ai/DeepSeek-V4.1-Flash", "name": "DeepSeek", "tier": "free",
+             "apiFormat": "chat_completions", "contextWindow": 128000}]},
+            "premiumModels": {"models": [
+            {"id": "gpt-5.5", "name": "GPT-5.5", "tier": "premium", "apiFormat": "chat_completions",
+             "baseUrl": "http://127.0.0.1:9/capture-me", "apiKey": "sk-prem"}]}}
+        st, raw = self.req("POST", "/import/milq",
+                           {"catalog": cat, "appcheck": "fake-jwt", "tokens": {"access_token": "at"}})
+        self.assertEqual(st, 200)
+        j = json.loads(raw)
+        self.assertTrue(j["ok"])
+        self.assertGreaterEqual(j["catalog_models"], 3)
+        # status shows import
+        st2, raw2 = self.req("GET", "/milq/status")
+        s2 = json.loads(raw2)
+        self.assertTrue(s2["has_appcheck"] and s2["has_session"])
+        # models now include captured tier info
+        st3, raw3 = self.req("GET", "/v1/models?tier=free")
+        ids = {m["id"] for m in json.loads(raw3)["data"]}
+        self.assertIn("gpt-6-astra", ids)
+        # routing a captured model hits the provider call (fake upstream returns 200 chat)
+        self.fake.script["capture-me"] = (200, {"id": "x", "choices": [{"message": {"role": "assistant", "content": "from milq proxy"}}],
+                                                "usage": {"prompt_tokens": 1, "completion_tokens": 2, "total_tokens": 3}})
+        st4, raw4 = self.req("POST", "/v1/chat/completions",
+                             {"model": "gpt-6-astra", "messages": [{"role": "user", "content": "hi"}]})
+        self.assertEqual(st4, 200)
+        self.assertEqual(json.loads(raw4)["choices"][0]["message"]["content"], "from milq proxy")
+        # headers carried: Authorization from captured apiKey + custom headers
+        call = [c for c in self.fake.calls if "capture-me" in c[1]][-1]
+        self.assertEqual(call[2].get("Authorization"), "Bearer sk-captured")
+        self.assertEqual(call[2].get("X-Route"), "milq")
+        # premium captured model routes without unlock gate (provider creds present)
+        st5, raw5 = self.req("POST", "/v1/chat/completions",
+                             {"model": "gpt-5.5", "messages": [{"role": "user", "content": "hi"}]})
+        self.assertEqual(st5, 200)
+        # teardown: wipe milq import so other tests are unaffected
+        S.MILQ.update({"catalog": None, "tokens": {}, "appcheck": None, "providers": []})
+        S.CATALOG = {}
+        S.refresh_catalog()
+
+    def test_parse_catalog_flattens_shapes(self):
+        flat = S.parse_catalog({"models": [{"id": "a", "name": "A", "apiKey": "k", "apiFormat": "chat_completions"}],
+                                "nested": {"deeper": [{"id": "b", "tier": "premium", "name": "B", "baseUrl": "http://x"}]}})
+        self.assertIn("a", flat); self.assertIn("b", flat)
+        self.assertEqual(flat["b"]["tier"], "premium")
 
     # ---- usage counters ----
     def test_usage_tracks_everything(self):
