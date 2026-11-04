@@ -118,7 +118,7 @@ class MainActivity : AppCompatActivity() {
         setPadding(dp(this@MainActivity, 16f), dp(this@MainActivity, 14f), dp(this@MainActivity, 16f), dp(this@MainActivity, 14f))
         background = GradientDrawable().apply {
             setColor(Color.parseColor("#0E1223")); cornerRadius = dp(this@MainActivity, 14f).toFloat()
-            setStroke(dp(this@MainActivity, 1), Color.parseColor("#334155"))
+            setStroke(dp(this@MainActivity, 1f), Color.parseColor("#334155"))
         }
     }
 
@@ -128,7 +128,7 @@ class MainActivity : AppCompatActivity() {
     private fun mbtn(label: String, filled: Boolean = true): MaterialButton = MaterialButton(this).apply {
         text = label; isAllCaps = false
         if (filled) { setBackgroundColor(Color.parseColor("#22C55E")); setTextColor(Color.parseColor("#0F172A")) }
-        else { setStroke(dp(this@MainActivity, 1), Color.parseColor("#334155")) }
+        else { strokeWidth = dp(this@MainActivity, 1f); strokeColor = android.content.res.ColorStateList.valueOf(Color.parseColor("#334155")) }
     }
 
     private fun padCol(): LinearLayout = LinearLayout(this).apply {
